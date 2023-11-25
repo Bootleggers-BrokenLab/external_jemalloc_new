@@ -41,7 +41,11 @@ get_large_size(size_t ind) {
 }
 
 TEST_BEGIN(test_grow_and_shrink) {
-	void *p, *q;
+	/*
+	 * Use volatile to workaround buffer overflow false positives
+	 * (-D_FORTIFY_SOURCE=3).
+	 */
+	void *volatile p, *volatile q;
 	size_t tsz;
 #define NCYCLES 3
 	unsigned i, j;
@@ -85,9 +89,13 @@ TEST_BEGIN(test_grow_and_shrink) {
 TEST_END
 
 static bool
-validate_fill(const void *p, uint8_t c, size_t offset, size_t len) {
+validate_fill(void *p, uint8_t c, size_t offset, size_t len) {
 	bool ret = false;
-	const uint8_t *buf = (const uint8_t *)p;
+	/*
+	 * Use volatile to workaround buffer overflow false positives
+	 * (-D_FORTIFY_SOURCE=3).
+	 */
+	uint8_t *volatile buf = (uint8_t *)p;
 	size_t i;
 
 	for (i = 0; i < len; i++) {
@@ -104,7 +112,11 @@ validate_fill(const void *p, uint8_t c, size_t offset, size_t len) {
 }
 
 TEST_BEGIN(test_zero) {
-	void *p, *q;
+	/*
+	 * Use volatile to workaround buffer overflow false positives
+	 * (-D_FORTIFY_SOURCE=3).
+	 */
+	void *volatile p, *volatile q;
 	size_t psz, qsz, i, j;
 	size_t start_sizes[] = {1, 3*1024, 63*1024, 4095*1024};
 #define FILL_BYTE 0xaaU
@@ -172,7 +184,11 @@ TEST_BEGIN(test_align) {
 TEST_END
 
 TEST_BEGIN(test_lg_align_and_zero) {
-	void *p, *q;
+	/*
+	 * Use volatile to workaround buffer overflow false positives
+	 * (-D_FORTIFY_SOURCE=3).
+	 */
+	void *volatile p, *volatile q;
 	unsigned lg_align;
 	size_t sz;
 #define MAX_LG_ALIGN 25
@@ -208,6 +224,16 @@ TEST_BEGIN(test_lg_align_and_zero) {
 }
 TEST_END
 
+/*
+ * GCC "-Walloc-size-larger-than" warning detects when one of the memory
+ * allocation functions is called with a size larger than the maximum size that
+ * they support. Here we want to explicitly test that the allocation functions
+ * do indeed fail properly when this is the case, which triggers the warning.
+ * Therefore we disable the warning for these tests.
+ */
+JEMALLOC_DIAGNOSTIC_PUSH
+JEMALLOC_DIAGNOSTIC_IGNORE_ALLOC_SIZE_LARGER_THAN
+
 TEST_BEGIN(test_overflow) {
 	size_t largemax;
 	void *p;
@@ -233,6 +259,9 @@ TEST_BEGIN(test_overflow) {
 	dallocx(p, 0);
 }
 TEST_END
+
+/* Re-enable the "-Walloc-size-larger-than=" warning */
+JEMALLOC_DIAGNOSTIC_POP
 
 int
 main(void) {
